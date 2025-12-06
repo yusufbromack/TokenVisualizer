@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Tokenizer Visualization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Font for better readability of code/tokens */
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .token-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Token Styles */
+        .token-span {
+            display: inline-block;
+            white-space: pre-wrap;
+            margin: 0 2px 2px 0;
+            padding: 0 2px;
+            border-radius: 4px;
+            border-width: 2px;
+            border-style: solid;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            transition: all 0.1s ease;
+        }
+
+        .token-span:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
+            position: relative;
+        }
+
+        /* Specific Colors requested: Red, Green, Yellow, Blue, Brown, Pink
+           Using CSS variables for easy tweaking
+        */
+        .token-red {
+            background-color: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+            color: #7f1d1d;
+        }
+
+        .token-green {
+            background-color: rgba(34, 197, 94, 0.15);
+            border-color: #22c55e;
+            color: #14532d;
+        }
+
+        .token-yellow {
+            background-color: rgba(234, 179, 8, 0.15);
+            border-color: #eab308;
+            color: #713f12;
+        }
+
+        .token-blue {
+            background-color: rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+            color: #1e3a8a;
+        }
+
+        .token-brown {
+            background-color: rgba(139, 69, 19, 0.15);
+            border-color: #8b4513;
+            color: #4a2508;
+        }
+
+        .token-pink {
+            background-color: rgba(236, 72, 153, 0.15);
+            border-color: #ec4899;
+            color: #831843;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shrink-0">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+                Token Visualizer
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">Visualize how LLMs parse your text.</p>
+        </div>
+
+        <div class="flex gap-4 items-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+            <div class="text-center">
+                <span class="block text-xs text-gray-400 uppercase tracking-wider font-semibold">Tokens</span>
+                <span id="token-count" class="text-xl font-bold text-blue-600">0</span>
+            </div>
+            <div class="w-px h-8 bg-gray-200"></div>
+            <div class="text-center">
+                <span class="block text-xs text-gray-400 uppercase tracking-wider font-semibold">Characters</span>
+                <span id="char-count" class="text-gray-700 font-medium">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+
+        <!-- Input Section -->
+        <div class="flex-1 p-4 flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white min-h-[300px]">
+            <div class="flex justify-between items-center mb-2">
+                <label for="input-text" class="text-sm font-medium text-gray-700">Input Text (Plaintext or Markdown)</label>
+                <button id="clear-btn" class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition">Clear</button>
+            </div>
+            <textarea
+                id="input-text"
+                class="flex-1 w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none font-mono text-sm leading-relaxed outline-none"
+                placeholder="Paste your text here to tokenize..."
+                spellcheck="false"
+            ></textarea>
+        </div>
+
+        <!-- Output Section -->
+        <div class="flex-1 p-4 flex flex-col bg-gray-50 relative">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-sm font-medium text-gray-700">Tokenized Output</h2>
+                <div id="status-indicator" class="text-xs text-gray-400 flex items-center gap-2">
+                    <div class="loader" id="loader"></div>
+                    <span id="loading-text">Loading Tokenizer...</span>
+                </div>
+            </div>
+
+            <div
+                id="output-container"
+                class="flex-1 w-full p-4 border border-gray-200 rounded-lg bg-white overflow-y-auto token-font break-words shadow-inner"
+            >
+                <span class="text-gray-400 italic text-sm">Tokens will appear here...</span>
+            </div>
+
+            <!-- Legend -->
+            <div class="mt-4 flex flex-wrap gap-2 justify-center text-xs text-gray-500">
+                <span class="px-2 py-1 rounded border border-red-500 bg-red-50">Red</span>
+                <span class="px-2 py-1 rounded border border-green-500 bg-green-50">Green</span>
+                <span class="px-2 py-1 rounded border border-yellow-500 bg-yellow-50">Yellow</span>
+                <span class="px-2 py-1 rounded border border-blue-500 bg-blue-50">Blue</span>
+                <span class="px-2 py-1 rounded border border-[#8b4513] bg-[#8b4513]/10">Brown</span>
+                <span class="px-2 py-1 rounded border border-pink-500 bg-pink-50">Pink</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- Logic -->
+    <script type="module">
+        import { getEncoding } from 'https://esm.sh/js-tiktoken@1.0.10';
+
+        // --- Elements ---
+        const inputArea = document.getElementById('input-text');
+        const outputContainer = document.getElementById('output-container');
+        const tokenCountDisplay = document.getElementById('token-count');
+        const charCountDisplay = document.getElementById('char-count');
+        const clearBtn = document.getElementById('clear-btn');
+        const statusIndicator = document.getElementById('status-indicator');
+        const loader = document.getElementById('loader');
+        const loadingText = document.getElementById('loading-text');
+
+        // --- Configuration ---
+        // Cycle: Red, Green, Yellow, Blue, Brown, Pink
+        const colors = [
+            'token-red',
+            'token-green',
+            'token-yellow',
+            'token-blue',
+            'token-brown',
+            'token-pink'
+        ];
+
+        let enc = null; // The tokenizer instance
+        let isTokenizerReady = false;
+
+        // --- Initialization ---
+        async function initTokenizer() {
+            try {
+                // Using cl100k_base (GPT-4/Turbo/Omni standard) as a proxy for modern LLMs
+                enc = getEncoding("cl100k_base");
+                isTokenizerReady = true;
+                loadingText.innerText = "Tokenizer Ready (cl100k_base)";
+                loadingText.classList.add("text-green-600");
+                loader.style.display = "none";
+
+                // If there's already text (e.g., from browser cache), process it
+                if(inputArea.value) processText();
+            } catch (error) {
+                console.error("Failed to load tokenizer:", error);
+                loadingText.innerText = "Using Fallback Tokenizer";
+                loader.style.display = "none";
+                isTokenizerReady = false; // Will trigger fallback logic
+            }
+        }
+
+        initTokenizer();
+
+        // --- Core Logic ---
+
+        /**
+         * Fallback tokenizer if the WebAssembly/JS library fails to load.
+         * Uses a simple regex to mimic token boundaries (words, punctuation, whitespace).
+         */
+        function fallbackTokenize(text) {
+            if (!text) return [];
+            // Splits by spaces, punctuation, symbols, preserving delimiters
+            const regex = /([a-zA-Z0-9]+|\s+|[^\s\w]+)/g;
+            const matches = text.match(regex);
+            return matches || [];
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        function processText() {
+            const text = inputArea.value;
+
+            // 1. Update Character Count
+            charCountDisplay.textContent = text.length.toLocaleString();
+
+            if (!text) {
+                outputContainer.innerHTML = '<span class="text-gray-400 italic text-sm">Tokens will appear here...</span>';
+                tokenCountDisplay.textContent = '0';
+                return;
+            }
+
+            let tokens = [];
+            let decodedTokens = [];
+
+            // 2. Tokenize
+            if (isTokenizerReady && enc) {
+                try {
+                    const uint8tokens = enc.encode(text);
+                    // Convert Uint32Array to regular array
+                    tokens = Array.from(uint8tokens);
+
+                    // Decode each token individually to get the string representation
+                    decodedTokens = tokens.map(t => {
+                        const decoded = enc.decode([t]);
+
+                        // Robust handling: library might return string, Uint8Array, or plain array
+                        if (typeof decoded === 'string') return decoded;
+
+                        // Ensure it is a Uint8Array before passing to TextDecoder
+                        // This fixes the "parameter 1 is not of type 'ArrayBuffer'" error if a plain array is returned
+                        const bytes = (decoded instanceof Uint8Array) ? decoded : new Uint8Array(decoded);
+                        return new TextDecoder().decode(bytes);
+                    });
+                } catch (e) {
+                    console.error("Tokenization error", e);
+                    decodedTokens = fallbackTokenize(text);
+                }
+            } else {
+                decodedTokens = fallbackTokenize(text);
+            }
+
+            // 3. Update Token Count
+            tokenCountDisplay.textContent = decodedTokens.length.toLocaleString();
+
+            // 4. Render HTML
+            let html = '';
+
+            decodedTokens.forEach((tokenStr, index) => {
+                const colorClass = colors[index % colors.length];
+
+                // Handle special whitespace chars for visualization
+                // If it's purely a newline, we might want a visual break, but usually
+                // tokenizers attach newlines to words or have separate tokens.
+                // We escape HTML first.
+                let safeContent = escapeHtml(tokenStr);
+
+                // Make spaces visible if they are leading/trailing?
+                // CSS white-space: pre-wrap handles most, but let's ensure empty tokens have height
+                if (safeContent === '') safeContent = '&nbsp;';
+
+                // Tooltip showing the raw token string (useful for debugging)
+                const titleAttr = `Token #${index + 1}: ${JSON.stringify(tokenStr)}`;
+
+                html += `<span class="token-span ${colorClass}" title='${titleAttr}'>${safeContent}</span>`;
+            });
+
+            outputContainer.innerHTML = html;
+        }
+
+        // --- Event Listeners ---
+
+        // Debounce function to prevent UI freezing on massive paste
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        const debouncedProcess = debounce(processText, 50);
+
+        inputArea.addEventListener('input', debouncedProcess);
+
+        clearBtn.addEventListener('click', () => {
+            inputArea.value = '';
+            inputArea.focus();
+            processText();
+        });
+
+    </script>
+</body>
+</html>

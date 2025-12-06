@@ -1,0 +1,5 @@
+phlprompts/
+__pycache__/
+.venv/
+Scrap.txt
+app.py

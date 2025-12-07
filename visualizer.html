@@ -6,7 +6,6 @@
     <title>LLM Tokenizer Visualization</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom Font for better readability of code/tokens */
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;600&display=swap');
 
         body {
@@ -39,9 +38,6 @@
             position: relative;
         }
 
-        /* Specific Colors requested: Red, Green, Yellow, Blue, Brown, Pink
-           Using CSS variables for easy tweaking
-        */
         .token-red {
             background-color: rgba(239, 68, 68, 0.15);
             border-color: #ef4444;
@@ -78,7 +74,6 @@
             color: #831843;
         }
 
-        /* Loading Spinner */
         .loader {
             border: 3px solid #f3f3f3;
             border-radius: 50%;
@@ -95,7 +90,6 @@
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
-
     <!-- Header -->
     <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shrink-0">
         <div>
@@ -268,7 +262,6 @@
                     decodedTokens = tokens.map(t => {
                         const decoded = enc.decode([t]);
 
-                        // Robust handling: library might return string, Uint8Array, or plain array
                         if (typeof decoded === 'string') return decoded;
 
                         // Ensure it is a Uint8Array before passing to TextDecoder
@@ -293,17 +286,10 @@
             decodedTokens.forEach((tokenStr, index) => {
                 const colorClass = colors[index % colors.length];
 
-                // Handle special whitespace chars for visualization
-                // If it's purely a newline, we might want a visual break, but usually
-                // tokenizers attach newlines to words or have separate tokens.
-                // We escape HTML first.
                 let safeContent = escapeHtml(tokenStr);
 
-                // Make spaces visible if they are leading/trailing?
-                // CSS white-space: pre-wrap handles most, but let's ensure empty tokens have height
                 if (safeContent === '') safeContent = '&nbsp;';
 
-                // Tooltip showing the raw token string (useful for debugging)
                 const titleAttr = `Token #${index + 1}: ${JSON.stringify(tokenStr)}`;
 
                 html += `<span class="token-span ${colorClass}" title='${titleAttr}'>${safeContent}</span>`;
